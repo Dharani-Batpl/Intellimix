@@ -1,0 +1,306 @@
+﻿@{
+    var title = ViewBag.Title ?? "Inventory Management System";
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+     var loggedInUser = Context.Session.GetString("User");
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title - Inventory Management System</title>
+
+   
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .sidebar {
+            width: 240px;
+            height: 100vh;
+            position: fixed;
+            background-color: #0d1b2a;
+            color: #fff;
+            padding-top: 1rem;
+            overflow-y: auto;
+        }
+
+        .sidebar h4 {
+            text-align: center;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .sidebar .nav-link {
+            color: #c9d1d9;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: #1b263b;
+            color: #fff;
+        }
+
+        .sidebar .submenu a.active {
+            background-color: #1b263b;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .sidebar .submenu a.active i {
+            color: #fff;
+        }
+
+        .sidebar .accordion-button.active {
+            background-color: #1b263b;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .submenu a {
+            padding: 8px 20px 8px 45px;
+            font-size: 0.9rem;
+            color: #bfc9d1;
+            display: block;
+            text-decoration: none;
+        }
+
+        .submenu a:hover {
+            background-color: #1b263b;
+            color: #fff;
+        }
+
+        .rotate {
+            transition: transform 0.3s ease;
+        }
+
+        .rotate.down {
+            transform: rotate(180deg);
+        }
+
+        .content {
+            margin-left: 240px;
+            padding: 20px;
+        }
+
+        .topbar {
+            background-color: #fff;
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: nowrap;
+        }
+
+        .topbar h5 {
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topbar .user-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+
+        footer {
+            text-align: center;
+            color: #777;
+            padding: 15px 0;
+            border-top: 1px solid #ddd;
+            margin-top: 30px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .bg-success {
+            background-color: #28a745 !important;
+        }
+
+        .bg-danger {
+            background-color: #dc3545 !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h4><i class="fa fa-boxes"></i> Inventory</h4>
+        <hr class="text-secondary" />
+
+        <div class="accordion" id="sidebarAccordion">
+
+            <!-- Masters Menu -->
+            <div class="accordion-item bg-transparent border-0">
+                <h2 class="accordion-header">
+                    <button class="nav-link accordion-button collapsed bg-transparent text-white" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#mastersMenu"
+                            aria-expanded="false" aria-controls="mastersMenu">
+                        <span><i class="fa fa-cogs me-2"></i> Masters</span>
+                    </button>
+                </h2>
+
+                <div id="mastersMenu" 
+                     class="accordion-collapse collapse @(currentController == "Zone"
+                        || currentController == "Location"
+                        || currentController == "MaterialType"
+                        || currentController == "MaterialSubstitute"
+                        || currentController == "Supplier"
+                        || currentController == "Label"
+                        || currentController == "Route"
+                        || currentController == "TestProperty" ? "show" : "")" 
+                     data-bs-parent="#sidebarAccordion">
+                    <div class="accordion-body submenu">
+                        <a href="@Url.Action("Index","Zone")" class="@(currentController == "Zone" ? "active" : "")">
+                            <i class="fa fa-layer-group"></i> Zone Master
+                        </a>
+                        <a href="@Url.Action("Index","Location")" class="@(currentController == "Location" ? "active" : "")">
+                            <i class="fa fa-map-marker-alt"></i> Location Master
+                        </a>
+                        <a href="@Url.Action("Index","MaterialType")" class="@(currentController == "MaterialType" ? "active" : "")">
+                            <i class="fa fa-cubes"></i> Material Type
+                        </a>
+                        <a href="@Url.Action("Index","MaterialSubstitute")" class="@(currentController == "MaterialSubstitute" ? "active" : "")">
+                            <i class="fa fa-random"></i> Material Substitute
+                        </a>
+                        <a href="@Url.Action("Index","Supplier")" class="@(currentController == "Supplier" ? "active" : "")">
+                            <i class="fa fa-industry"></i> Supplier Master
+                        </a>
+                        <a href="@Url.Action("Index","Label")" class="@(currentController == "Label" ? "active" : "")">
+                            <i class="fa fa-tags"></i> Label Master
+                        </a>
+                        <a href="@Url.Action("Index","Route")" class="@(currentController == "Route" ? "active" : "")">
+                            <i class="fa fa-route"></i> Route Master
+                        </a>
+                        <a href="@Url.Action("Index","TestProperty")" class="@(currentController == "TestProperty" ? "active" : "")">
+                            <i class="fa fa-vial"></i> Test Properties Master
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Menu -->
+            <div class="accordion-item bg-transparent border-0">
+                <h2 class="accordion-header">
+                    <button class="nav-link accordion-button collapsed bg-transparent text-white" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#inventoryMenu"
+                            aria-expanded="false" aria-controls="inventoryMenu">
+                        <span><i class="fa fa-warehouse me-2"></i> Inventory</span>
+                    </button>
+                </h2>
+                <div id="inventoryMenu" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+                    <div class="accordion-body submenu">
+                        <a href="#"><i class="fa fa-box"></i> Stock Overview</a>
+                        <a href="#"><i class="fa fa-exchange-alt"></i> Movements</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboards Menu -->
+            <div class="accordion-item bg-transparent border-0">
+                <h2 class="accordion-header">
+                    <button class="nav-link accordion-button collapsed bg-transparent text-white" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#dashboardMenu"
+                            aria-expanded="false" aria-controls="dashboardMenu">
+                        <span><i class="fa fa-chart-pie me-2"></i> Dashboards</span>
+                    </button>
+                </h2>
+                <div id="dashboardMenu" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+                    <div class="accordion-body submenu">
+                        <a href="#"><i class="fa fa-chart-line"></i> Inventory Dashboard</a>
+                        <a href="#"><i class="fa fa-clipboard-list"></i> Reports</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Production Menu -->
+            <div class="accordion-item bg-transparent border-0">
+                <h2 class="accordion-header">
+                    <button class="nav-link accordion-button collapsed bg-transparent text-white" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#productionMenu"
+                            aria-expanded="false" aria-controls="productionMenu">
+                        <span><i class="fa fa-industry me-2"></i> Production</span>
+                    </button>
+                </h2>
+                <div id="productionMenu" class="accordion-collapse collapse @(currentController == "BillOfMaterial" ? "show" : "")" 
+                     data-bs-parent="#sidebarAccordion">
+                    <div class="accordion-body submenu">
+                        <a href="#" class="@(currentController == "Production" ? "active" : "")"><i class="fa fa-chart-line"></i> Production</a>
+                        <a href="@Url.Action("Index", "Recipe")" class="@(currentController == "Recipe" ? "active" : "")"><i class="fa fa-clipboard-list"></i> Recipe Creation</a>
+                        <a href="#" class="@(currentController == "WorkOrderCreation" ? "active" : "")"><i class="fa fa-clipboard-list"></i> Work Order Creation</a>
+                        <a href="#" class="@(currentController == "ProductionPlanning" ? "active" : "")"><i class="fa fa-clipboard-list"></i> Production Planning</a>
+                        <a href="#" class="@(currentController == "VesselMapping" ? "active" : "")"><i class="fa fa-clipboard-list"></i> Vessel Mapping</a>
+                        <a href="#" class="@(currentController == "WorkOrderStatus" ? "active" : "")"><i class="fa fa-clipboard-list"></i> Work Order Status</a>
+                        <a href="@Url.Action("Index", "BillOfMaterial")" class="@(currentController == "BillOfMaterial" ? "active" : "")"><i class="fa fa-clipboard-list"></i> Bill of Material</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content">
+        <div class="topbar">
+            <h5>@title</h5>
+            <div class="d-flex align-items-center gap-3 ms-auto">
+                <div class="user-status">
+                    <span>Welcome, @(string.IsNullOrEmpty(loggedInUser) ? "Guest" : loggedInUser)</span>
+                    <span class="status-dot @(ViewBag.ApiStatus == "Healthy" ? "bg-success" : "bg-danger")"></span>
+                </div>
+                <div>
+                    <form method="post" action="@Url.Action("Login","User")" class="m-0">
+                        <input type="hidden" name="startup" value="true" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <main class="mt-3">
+            @RenderBody()
+        </main>
+
+       <footer class="text-center py-2">
+    &copy; @DateTime.Now.Year - Inventory Management System 
+    <span id="footerTime" class="text-muted"></span>
+</footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    $(document).ready(function () {
+        function updateFooterTime() {
+            const now = new Date();
+            const options = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true };
+            const formatted = now.toLocaleString('en-US', options).replace(',', '');
+            $('#footerTime').text('| ' + formatted);
+        }
+
+        updateFooterTime();
+        setInterval(updateFooterTime, 1000);
+    });
+</script>s
+</body>
+</html>

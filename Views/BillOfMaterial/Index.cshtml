@@ -1,0 +1,575 @@
+﻿@model List<IntelliMix_Core.Models.BillOfMaterial>
+
+@{
+    ViewBag.Title = "Bill of Materials";
+    var billOfMaterials = Model ?? new List<IntelliMix_Core.Models.BillOfMaterial>();
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>@ViewBag.Title</title>
+
+    <!-- Bootstrap & Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Tabulator -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.1/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.5.1/dist/js/tabulator.min.js"></script>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <style>
+        body { background-color: #f8f9fa; }
+        .btn { border-radius: 8px; }
+        .tabulator-row:hover { background-color: rgba(13, 110, 253, 0.05) !important; }
+        .sequence-card { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 15px; margin-bottom: 15px; position: relative; }
+        .remove-sequence { position: absolute; top: 8px; right: 8px; }
+        input[readonly], .readonly-field { background-color: #f0f0f0 !important; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<div class="container-fluid mt-3">
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5><b>Bill of Materials</b></h5>
+                    <small class="text-muted">Manage production process parameters and sequences</small>
+                </div>
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-primary me-2" id="addBtn"><i class="fa fa-plus"></i> Add</button>
+                    <a href="@Url.Action("ExportCsv", "BillOfMaterial")" class="btn btn-warning text-white me-2">
+                        <i class="fa fa-file-export"></i> Export CSV
+                    </a>
+                    <label for="csvFileInput" class="btn btn-success d-flex align-items-center gap-2 mb-0">
+                        <i class="fa fa-file-csv"></i> Import CSV
+                    </label>
+                    <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+                </div>
+            </div>
+            <div class="d-flex justify-content-end mb-3">
+                <input type="text" id="tableSearch" class="form-control form-control-sm" placeholder="🔍 Search...">
+            </div>
+            <div id="bom-table"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="bomModal" tabindex="-1" aria-labelledby="bomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <form id="bomForm" method="post" action="@Url.Action("SaveBOM", "BillOfMaterial")">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-semibold" id="bomModalLabel">Add Bill of Material</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Process Program</label>
+                            <input type="text" class="form-control form-control-sm" name="ProcessProgram" required>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-semibold mb-0">Sequences</h6>
+                        <button type="button" id="addSequenceBtn" class="btn btn-danger btn-sm">
+                            <i class="fa fa-plus"></i> Add Sequence
+                        </button>
+                    </div>
+                    <div id="sequenceContainer"></div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                   <button type="submit" id="btnSave" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">Are you sure you want to delete <b id="deleteItemName"></b>?</div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function () {
+    var bomModal = new bootstrap.Modal($('#bomModal')[0]);
+    var deleteModal = new bootstrap.Modal($('#deleteModal')[0]);
+    var $bomForm = $('#bomForm');
+    var deleteId = null;
+    var vSequenceCount = 0;
+    var $vSequenceContainer = $("#sequenceContainer");
+
+    // Load BOM data from Model
+    var bomData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+    Model.Select(item => new {
+        program_Code = item.Program_Code,
+        _Created_By = item._Created_By,
+        noOfSeq = item.Sequences != null ? item.Sequences.Count : 0,
+        _Created_At = item._Created_At?.ToString("yyyy-MM-dd HH:mm") ?? "",
+        _Modified_By = item._Modified_By,
+        _Modified_At = item._Modified_At?.ToString("yyyy-MM-dd HH:mm") ?? "",
+        Sequences = item.Sequences?.Select(seq => new {
+            sequence_no = seq.sequence_no,
+            time = seq.time,
+            temp = seq.temp,
+            rpm = seq.rpm,
+            energy = seq.energy,
+            mix_mode = seq.mix_mode,
+            event1 = seq.event1,
+            event2 = seq.event2,
+            event3 = seq.event3,
+            event4 = seq.event4,
+            remarks = seq.remarks
+        }).ToList()
+    })
+));
+
+
+
+    // Load event options dynamically from API
+    var eventOptions = [];
+
+    function loadEventOptions(callback) {
+        $.ajax({
+            url: '/BillOfMaterial/KneaderEvents',
+            type: 'GET',
+            success: function (data) {
+                eventOptions = data || [];
+                console.log("Kneader events loaded:", eventOptions);
+                if (callback) callback();
+            },
+            error: function (err) {
+                console.error("Error fetching kneader events:", err);
+                eventOptions = [];
+                if (callback) callback();
+            }
+        });
+    }
+
+    // Function to generate dropdown for events
+    function getEventDropdown(name, selectedValue) {
+    // Extract event code if value is like "302-Dumper Close"
+    var selectedCode = selectedValue ? selectedValue.split('-')[0].trim() : "";
+
+    var options = '<option value="">Select Event</option>';
+    $.each(eventOptions, function (_, ev) {
+        var isSelected = ev.event_code == selectedCode ? ' selected' : '';
+        options += `<option value="${ev.event_code}"${isSelected}>${ev.event_code} - ${ev.event_name}</option>`;
+    });
+    return `<select class="form-select form-select-sm" name="${name}">${options}</select>`;
+}
+
+
+    // Function to add sequence dynamically
+    function addSequence(seqData = {}) {
+        vSequenceCount++;
+        var $div = $(`
+            <div class="sequence-card">
+                <button type="button" class="btn-close remove-sequence"></button>
+                <h6 class="fw-bold mb-3 text-primary">Sequence ${vSequenceCount}</h6>
+                <div class="row g-2">
+                    <div class="col-md-3"><label class="small fw-semibold">Time (s)</label>
+                        <input type="number" class="form-control form-control-sm seq-time" name="Sequences[${vSequenceCount}].Time" value="${seqData.Time || ''}"></div>
+                    <div class="col-md-3"><label class="small fw-semibold">Temp (°C)</label>
+                        <input type="number" class="form-control form-control-sm seq-temp" name="Sequences[${vSequenceCount}].Temp" value="${seqData.Temp || ''}"></div>
+                    <div class="col-md-3"><label class="small fw-semibold">RPM (rev/min)</label>
+                        <input type="number" class="form-control form-control-sm seq-rpm" name="Sequences[${vSequenceCount}].RPM" value="${seqData.RPM || ''}"></div>
+                    <div class="col-md-3"><label class="small fw-semibold">Energy (kWh)</label>
+                        <input type="number" class="form-control form-control-sm seq-energy" name="Sequences[${vSequenceCount}].Energy" value="${seqData.Energy || ''}"></div>
+                    <div class="col-md-3"><label class="small fw-semibold">Mode</label>
+                        <select class="form-select form-select-sm seq-mode" name="Sequences[${vSequenceCount}].Mode">
+                            <option value="">Select Mode</option>
+                            <option value="Time">Time</option>
+                            <option value="Temperature">Temperature</option>
+                            <option value="Time and Temperature">Time and Temperature</option>
+                            <option value="Time or Temperature">Time or Temperature</option>
+                            <option value="RPM">RPM</option>
+                            <option value="Time and RPM">Time and RPM</option>
+                            <option value="Temperature and RPM">Temperature and RPM</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3"><label class="small fw-semibold">Event 1</label>${getEventDropdown(`Sequences[${vSequenceCount}].Event1`, seqData.Event1)}</div>
+                    <div class="col-md-3"><label class="small fw-semibold">Event 2</label>${getEventDropdown(`Sequences[${vSequenceCount}].Event2`, seqData.Event2)}</div>
+                    <div class="col-md-3"><label class="small fw-semibold">Event 3</label>${getEventDropdown(`Sequences[${vSequenceCount}].Event3`, seqData.Event3)}</div>
+                    <div class="col-md-3"><label class="small fw-semibold">Event 4</label>${getEventDropdown(`Sequences[${vSequenceCount}].Event4`, seqData.Event4)}</div>
+                    <div class="col-12"><label class="small fw-semibold">Remarks</label>
+                        <textarea class="form-control form-control-sm" name="Sequences[${vSequenceCount}].Remarks" rows="2">${seqData.Remarks || ''}</textarea></div>
+                </div>
+            </div>
+        `);
+
+        $vSequenceContainer.append($div);
+
+        // Handle mode field enable/disable
+var $modeSelect = $div.find('.seq-mode');
+var $timeInput = $div.find('.seq-time');
+var $tempInput = $div.find('.seq-temp');
+var $rpmInput = $div.find('.seq-rpm');
+var $energyInput = $div.find('.seq-energy');
+
+// --- Function to update enabled/disabled states ---
+function updateFields(vMode) {
+    // Always enable all for displaying values
+    $timeInput.prop('disabled', false);
+    $tempInput.prop('disabled', false);
+    $rpmInput.prop('disabled', false);
+    $energyInput.prop('disabled', false);
+
+    // Disable fields that don't belong to selected mode
+    switch (vMode) {
+        case "Time":
+            $tempInput.prop('disabled', true);
+            $rpmInput.prop('disabled', true);
+            break;
+        case "Temperature":
+            $timeInput.prop('disabled', true);
+            $rpmInput.prop('disabled', true);
+            break;
+        case "Time and Temperature":
+        case "Time or Temperature":
+            $rpmInput.prop('disabled', true);
+            break;
+        case "RPM":
+            $timeInput.prop('disabled', true);
+            $tempInput.prop('disabled', true);
+            break;
+        case "Time and RPM":
+            $tempInput.prop('disabled', true);
+            break;
+        case "Temperature and RPM":
+            $timeInput.prop('disabled', true);
+            break;
+        default:
+            $timeInput.prop('disabled', true);
+            $tempInput.prop('disabled', true);
+            $rpmInput.prop('disabled', true);
+            break;
+    }
+}
+
+// --- Assign existing values (for edit mode) ---
+$timeInput.val(seqData.time ?? seqData.Time ?? "");
+$tempInput.val(seqData.temp ?? seqData.Temp ?? "");
+$rpmInput.val(seqData.rpm ?? seqData.RPM ?? "");
+$energyInput.val(seqData.energy ?? seqData.Energy ?? "");
+$modeSelect.val(seqData.mix_mode ?? seqData.Mode ?? "");
+$div.find('textarea').val(seqData.remarks ?? seqData.Remarks ?? "");
+
+// --- Initialize proper field state ---
+updateFields($modeSelect.val());
+
+// --- Handle mode change dynamically ---
+$modeSelect.on('change', function () {
+    var vNewMode = $(this).val();
+    // 1) update which fields are enabled/disabled
+    updateFields(vNewMode);
+
+    // 2) clear only those fields that are disabled now
+    if ($timeInput.is(':disabled')) $timeInput.val('');
+    if ($tempInput.is(':disabled')) $tempInput.val('');
+    if ($rpmInput.is(':disabled')) $rpmInput.val('');
+
+    // 3) keep energy untouched (always enabled by design)
+    // Optional: focus first enabled input
+    if (!$timeInput.is(':disabled')) $timeInput.focus();
+    else if (!$tempInput.is(':disabled')) $tempInput.focus();
+    else if (!$rpmInput.is(':disabled')) $rpmInput.focus();
+});
+
+
+
+// Remove sequence logic
+$div.find('.remove-sequence').on('click', function () {
+    $div.remove();
+    updateSequenceNumbers();
+});
+
+    // Update sequence numbering dynamically
+    function updateSequenceNumbers() {
+        var cards = $vSequenceContainer.find('.sequence-card');
+        vSequenceCount = 0;
+        cards.each(function (idx, card) {
+            vSequenceCount++;
+            $(card).find('h6').text(`Sequence ${vSequenceCount}`);
+            $(card).find('input, select, textarea').each(function () {
+                var name = $(this).attr('name');
+                $(this).attr('name', name.replace(/Sequences\[\d+\]/, `Sequences[${vSequenceCount}]`));
+            });
+        });
+    }
+}
+    console.log("Loaded BOM Data:", bomData);
+
+    // Load events first, then initialize table and handlers
+    loadEventOptions(function () {
+
+        // Initialize Tabulator
+        var table = new Tabulator("#bom-table", {
+            data: bomData,
+            layout: "fitColumns",
+            pagination: "local",
+            paginationSize: 5,
+            columns: [
+               { title: "Process Program", field: "program_Code" },
+                { title: "No of Sequences", field: "noOfSeq"},
+                { title: "Created By", field: "_Created_By" },
+                { title: "Created At", field: "_Created_At" },
+                { title: "Modified By", field: "_Modified_By" },
+                { title: "Modified At", field: "_Modified_At" },
+
+                {
+                    title: "View",
+                    hozAlign: "center",
+                    formatter: () => `<i class="fa fa-eye text-primary view-icon" style="cursor:pointer; font-size:16px;" title="View Details"></i>`,
+                   cellClick: function (e, cell) {
+                        var row = cell.getRow().getData();
+
+                        // Reset modal
+                        $bomForm[0].reset();
+                        $vSequenceContainer.empty();
+                        vSequenceCount = 0;
+
+                        // Fill program name
+                        var $processProgramInput = $bomForm.find('[name="ProcessProgram"]');
+                        $processProgramInput.val(row.program_Code).prop('readonly', true).addClass('readonly-field');
+
+                        // Load sequences
+                        if (row.Sequences && row.Sequences.length) {
+                            row.Sequences.forEach(seq => addSequence({
+                                Time: seq.time,
+                                Temp: seq.temp,
+                                RPM: seq.rpm,
+                                Energy: seq.energy,
+                                Mode: seq.mix_mode,
+                                Event1: seq.event1,
+                                Event2: seq.event2,
+                                Event3: seq.event3,
+                                Event4: seq.event4,
+                                Remarks: seq.remarks
+                            }));
+                        }
+
+                        // Disable all inputs and dropdowns
+                        $bomForm.find('input, select, textarea').prop('disabled', true);
+                        $('#addSequenceBtn').hide();  // hide add sequence
+                        $('#btnSave').hide();         // hide save/update button
+                        $('#bomModalLabel').text("View Bill of Material");
+
+                        bomModal.show();
+                    }
+
+                },
+                {
+                    title: "Actions", hozAlign: "center",
+                    formatter: cell => `
+                        <span class="edit-btn text-primary" style="cursor:pointer;">Edit</span>
+                        <span class="mx-2 text-muted">|</span>
+                        <span class="delete-btn text-danger" style="cursor:pointer;">Delete</span>
+                    `,
+                    cellClick: function (e, cell) {
+                        var row = cell.getRow().getData();
+                        if ($(e.target).hasClass('edit-btn')) {
+                            $bomForm.find('input, select, textarea').prop('disabled', false);
+                            $('#addSequenceBtn').show();
+                            $('#btnSave').show();
+                            $bomForm[0].reset();
+                            $vSequenceContainer.empty();
+                            vSequenceCount = 0;
+                           var $processProgramInput = $bomForm.find('[name="ProcessProgram"]');
+                      $processProgramInput.val(row.program_Code).prop('readonly', true).addClass('readonly-field');
+                            if (row.Sequences && row.Sequences.length) {
+                            row.Sequences.forEach(seq => addSequence({
+                                Time: seq.time,
+                                Temp: seq.temp,
+                                RPM: seq.rpm,
+                                Energy: seq.energy,
+                                Mode: seq.mix_mode,
+                                Event1: seq.event1,
+                                Event2: seq.event2,
+                                Event3: seq.event3,
+                                Event4: seq.event4,
+                                Remarks: seq.remarks
+                            }));
+                        } else {
+                            addSequence();
+                        }
+                         $('#btnSave').text('Update');
+                            $('#bomModalLabel').text("Edit Bill of Material");
+                            bomModal.show();
+                        }
+                        if ($(e.target).hasClass('delete-btn')) {
+                            deleteId = row.program_Code;
+                            $('#deleteItemName').text(row.program_Code);
+                            deleteModal.show();
+                        }
+                    }
+                }
+            ]
+        });
+
+        // Search Filter
+        
+        $('#tableSearch').on('keyup', function () {
+            var query = $(this).val().trim().toLowerCase();
+            if (query === '') {
+                table.clearFilter();
+            } else {
+                table.setFilter([
+                    [
+                        { field: "program_Code", type: "like", value: query },
+                        { field: "noOfSeq", type: "like", value: query },
+                        { field: "_Created_By", type: "like", value: query },
+                        { field: "_Modified_By", type: "like", value: query },
+                        { field: "_Created_At", type: "like", value: query },
+                        { field: "_Modified_At", type: "like", value: query }
+                    ]
+                ]);
+            }
+        });
+
+
+        // Add new BOM
+        $('#addBtn').on('click', function () {
+            $bomForm[0].reset();
+            $vSequenceContainer.empty();
+            vSequenceCount = 0;
+            addSequence();
+            $('#bomModalLabel').text("Add Bill of Material");
+             var $processProgramInput = $bomForm.find('[name="ProcessProgram"]');
+    $processProgramInput.prop('readonly', false).removeClass('readonly-field');
+            bomModal.show();
+        });
+
+        $('#addSequenceBtn').on('click', addSequence);
+
+       // Save BOM
+       $bomForm.on('submit', function (e) {
+        e.preventDefault();
+        var vActionType = $('#btnSave').text().trim(); // Detect Save or Update
+        var vApiUrl = (vActionType === 'Update')
+        ? '/BillOfMaterial/UpdateBOM'
+        : '/BillOfMaterial/SaveBOM';
+
+    // Build main BOM object
+    var bomObj = {
+        program_code: $bomForm.find('[name="ProcessProgram"]').val(),
+        _created_by: 'Admin',
+        Sequences: []
+    };
+    function getEventFullValue(selectEl) {
+    var vCode = $(selectEl).val();
+    if (!vCode) return null;
+    var vEvent = eventOptions.find(e => e.event_code == vCode);
+    return vEvent ? `${vEvent.event_code}-${vEvent.event_name}` : vCode;
+}
+    // Collect sequence data
+    $vSequenceContainer.find('.sequence-card').each(function () {
+        var vTime = $(this).find('.seq-time').val();
+        var vTemp = $(this).find('.seq-temp').val();
+        var vRpm = $(this).find('.seq-rpm').val();
+        var vEnergy = $(this).find('.seq-energy').val();
+
+        var seq = {
+            time: isNaN(parseInt(vTime)) ? null : parseInt(vTime),
+            temp: isNaN(parseInt(vTemp)) ? null : parseInt(vTemp),
+            rpm: isNaN(parseInt(vRpm)) ? null : parseInt(vRpm),
+            energy: isNaN(parseInt(vEnergy)) ? null : parseInt(vEnergy),
+            mix_mode: $(this).find('.seq-mode').val() || null,
+            event1: getEventFullValue($(this).find('[name*="Event1"]')) || null,
+            event2: getEventFullValue($(this).find('[name*="Event2"]'))|| null,
+            event3: getEventFullValue($(this).find('[name*="Event3"]'))|| null,
+            event4: getEventFullValue($(this).find('[name*="Event4"]'))|| null,
+            remarks: $(this).find('textarea').val() || null
+        };
+
+        bomObj.Sequences.push(seq);
+    });
+
+    // Log formatted JSON to console
+    console.log("Payload to API:\n", JSON.stringify(bomObj, null, 2));
+
+    // AJAX call
+    $.ajax({
+        url: vApiUrl,
+        type: 'POST',
+        data: JSON.stringify(bomObj),
+        contentType: 'application/json',
+        success: function (res) {
+            if (res.success) {
+                alert(res.message || "✅ BOM saved successfully!");
+                bomModal.hide();
+                location.reload();
+            } else {
+                alert(res.message || "⚠️ Failed to save BOM.");
+            }
+        },
+        error: function (err) {
+            alert("❌ Error saving BOM. Please try again.");
+            console.error("Error:", err);
+        }
+    });
+});
+
+
+        // Delete BOM
+        $('#confirmDeleteBtn').off('click').on('click', function () {
+            console.log("Deleting program code:", deleteId);
+            $.ajax({
+                url: `/BillOfMaterial/DeleteBOM?program_code=${deleteId}`,
+                type: 'POST',
+                success: function (data) {
+                    alert(data.message);
+                    if (data.success) location.reload();
+                },
+                error: function (err) {
+                    console.error("Error deleting BOM:", err);
+                    alert("Error deleting BOM");
+                }
+            });
+            deleteModal.hide();
+        });
+
+        // CSV Import
+        $('#csvFileInput').on('change', function () {
+            var file = this.files[0];
+            if (!file) return;
+            var fd = new FormData();
+            fd.append('file', file);
+            $.ajax({
+                url: '/BillOfMaterial/ImportCsv',
+                method: 'POST',
+                data: fd,
+                processData: false,
+                contentType: false,
+                success: function (data) {
+                    alert(data.success ? data.message : "Import failed: " + data.message);
+                    if (data.success) location.reload();
+                }
+            });
+        });
+    }); // end of loadEventOptions callback
+});
+</script>
+
+</body>
+</html>

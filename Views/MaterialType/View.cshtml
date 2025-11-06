@@ -1,0 +1,464 @@
+﻿
+@model List<Intellimix_Core.Models.MaterialTypeModel>
+
+@{
+    ViewBag.Title = "Material Type Master";
+    var materials = Model ?? new List<Intellimix_Core.Models.MaterialTypeModel>();
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>@ViewBag.Title</title>
+
+    <!-- Bootstrap CSS & JS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Tabulator CSS & JS -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.1/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.5.1/dist/js/tabulator.min.js"></script>
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .badge {
+            font-size: 0.8rem;
+        }
+
+        .btn {
+            border-radius: 8px;
+        }
+
+        .card-stats {
+            border-left: 5px solid #0d6efd;
+            transition: 0.3s;
+        }
+
+            .card-stats:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            }
+
+        input[readonly], .readonly-field {
+            background-color: #f0f0f0 !important;
+            cursor: not-allowed;
+        }
+
+        .tabulator-row {
+            transition: background-color 0.25s ease-in-out;
+        }
+
+            .tabulator-row:hover {
+                background-color: rgba(13, 110, 253, 0.05) !important;
+            }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-3">
+
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5><b>Material Type Master</b></h5>
+                        <small class="text-muted">Manage material type classifications and properties</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-primary me-2" id="addBtn"><i class="fa fa-plus"></i> Add</button>
+                        <a href="@Url.Action("ExportCsv", "MaterialType", new { filter = ViewBag.CurrentFilter })" class="btn btn-warning text-white me-2">
+                            <i class="fa fa-file-export"></i> Export CSV
+                        </a>
+                        <label for="csvFileInput" class="btn btn-success d-flex align-items-center gap-2 mb-0" style="border-radius: 8px; padding: 8px 16px; font-weight: 500;">
+                            <i class="fa fa-file-csv"></i> Import CSV
+                        </label>
+                        <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="d-flex mb-4">
+                    <a class="btn btn-outline-secondary me-2 @(ViewBag.CurrentFilter=="all"?"active":"")" href="@Url.Action("Index", new { filter="all" })">All</a>
+                    <a class="btn btn-outline-secondary me-2 @(ViewBag.CurrentFilter=="active"?"active":"")" href="@Url.Action("Index", new { filter="active" })">Active</a>
+                    <a class="btn btn-outline-secondary @(ViewBag.CurrentFilter=="inactive"?"active":"")" href="@Url.Action("Index", new { filter="inactive" })">Inactive</a>
+                </div>
+
+                <!-- Dashboard Tiles -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card card-stats border-primary text-center">
+                            <div class="card-body">
+                                <h4 class="fw-bold">@ViewBag.TotalTypes</h4>
+                                <p class="text-muted mb-0">Total Types</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-stats border-success text-center">
+                            <div class="card-body">
+                                <h4 class="fw-bold text-success">@ViewBag.ActiveTypes</h4>
+                                <p class="text-muted mb-0">Active</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-stats border-danger text-center">
+                            <div class="card-body">
+                                <h4 class="fw-bold text-danger">@ViewBag.InactiveTypes</h4>
+                                <p class="text-muted mb-0">Inactive</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-stats border-info text-center">
+                            <div class="card-body">
+                                <h4 class="fw-bold text-info">@ViewBag.TotalMaterials</h4>
+                                <p class="text-muted mb-0">Total Materials</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabulator Table -->
+                @*<div id="material-table"></div>*@
+
+
+
+                <!--Plain table -->
+                <table class="table table-bordered table-hover table-sm" id="materialTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Type Code</th>
+                            <th>Type Name</th>
+                            <th>Description</th>
+                            <th>Default Storage Condition</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Updated At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in materials)
+                        {
+                            var activeFlag = item.active_flag ?? false; 
+                            <tr data-id="@item.material_type_id">
+                                <td>@item.material_type_code</td>
+                                <td>@item.material_type_name</td>
+                                <td>@item.description</td>
+                                <td>@item.default_storage_condition</td>
+                                <td>
+                                    <span class="badge @(activeFlag ? "bg-success" : "bg-danger")">
+                                        @(activeFlag ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>@item.created_at</td>
+                                <td>@item.updated_at</td>
+                                <td>
+                                    <span class="edit-btn text-primary" style="cursor:pointer;">Edit</span>
+                                    <span class="mx-2 text-muted">|</span>
+                                    <span class="delete-btn text-danger" style="cursor:pointer;">Delete</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal fade" id="materialModal" tabindex="-1" aria-labelledby="materialModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <form id="materialForm" method="post" action="@Url.Action("SaveMaterial", "MaterialType")">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-semibold" id="materialModalLabel">Add Material Type</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body pt-2">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Type Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" name="material_type_code" minlength="3" maxlength="32" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Type Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" name="material_type_name" minlength="3" maxlength="32" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold small">Description <span class="text-danger">*</span></label>
+                                <textarea class="form-control form-control-sm" name="description" rows="3" minlength="3" maxlength="200" required></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Default Storage Condition <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" name="default_storage_condition" minlength="3" maxlength="128" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small d-block">Status</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="active_flag" value="true" checked>
+                                    <label class="form-check-label small">Active</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="active_flag" value="false">
+                                    <label class="form-check-label small">Inactive</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm px-3">Save Material Type</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete <b id="deleteItemName"></b>?
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">Yes, Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>
+document.addEventListener('DOMContentLoaded', function () {
+    var materialModal = new bootstrap.Modal(document.getElementById('materialModal'));
+    var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    var materialForm = document.getElementById('materialForm');
+    var deleteId = null;
+
+    // Convert Razor materials into JS array
+   var materialsData = [
+    @foreach (var item in materials)
+    {
+       var activeFlag = item.active_flag ?? false; 
+        <text>{
+            id: "@item.material_type_id",
+            typeCode: "@item.material_type_code",
+            typeName: "@item.material_type_name",
+            description: "@item.description",
+            defaultStorage: "@item.default_storage_condition",
+            status: "@(activeFlag ? "Active" : "Inactive")",
+            createdAt: "@item.created_at",
+            updatedAt: "@item.updated_at"
+        },</text>
+    }
+];
+
+
+    // Initialize Tabulator
+    //var table = new Tabulator("#material-table", {
+    //    data: materialsData,
+    //    layout: "fitColumns",
+    //    responsiveLayout: "hide",
+    //    pagination: "local",
+    //    paginationSize: 5,
+    //    rowHeight: 45,
+    //    columns: [
+    //        { title: "Type Code", field: "typeCode", sorter: "string" },
+    //        { title: "Type Name", field: "typeName", sorter: "string" },
+    //        { title: "Description", field: "description", sorter: "string" },
+    //        { title: "Default Storage Condition", field: "defaultStorage", sorter: "string" },
+    //        {
+    //            title: "Status", field: "status", sorter: "string",
+    //            formatter: function(cell) {
+    //                let val = cell.getValue();
+    //                return `<span class="badge ${val=="Active"?"bg-success":"bg-danger"}">${val}</span>`;
+    //            }
+    //        },
+    //        { title: "Created At", field: "createdAt", sorter: "datetime" },
+    //        { title: "Updated At", field: "updatedAt", sorter: "datetime" },
+    //        {
+    //            title: "Actions", field: "id", hozAlign: "center",
+    //            formatter: function(cell) {
+    //                return ` <span class="edit-btn text-primary" style="cursor:pointer;">Edit</span>
+    //        <span class="mx-2 text-muted">|</span>
+    //        <span class="delete-btn text-danger" style="cursor:pointer;">Delete</span>`;
+    //            },
+    //            cellClick: function(e, cell) {
+    //                var rowData = cell.getRow().getData();
+
+    //                if (e.target.classList.contains('edit-btn')) {
+    //                    // Edit logic
+    //                    materialForm.dataset.id = rowData.id;
+    //                    document.querySelector('input[name="material_type_code"]').value = rowData.typeCode;
+    //                    document.querySelector('input[name="material_type_code"]').readOnly = true;
+    //                    document.querySelector('input[name="material_type_code"]').classList.add('readonly-field');
+    //                    document.querySelector('input[name="material_type_name"]').value = rowData.typeName;
+    //                    document.querySelector('textarea[name="description"]').value = rowData.description;
+    //                    document.querySelector('input[name="default_storage_condition"]').value = rowData.defaultStorage;
+    //                    document.querySelector(`input[name="active_flag"][value="${rowData.status==="Active"}"]`).checked = true;
+    //                    document.getElementById('materialModalLabel').innerText = "Edit Material Type";
+    //                    document.querySelector('#materialForm button[type="submit"]').innerText = "Update";
+    //                    materialModal.show();
+    //                }
+
+    //                if (e.target.classList.contains('delete-btn')) {
+    //                    deleteId = rowData.id;
+    //                    document.getElementById('deleteItemName').innerText = rowData.typeName;
+    //                    deleteModal.show();
+    //                }
+    //            }
+    //        }
+    //    ]
+    //});
+
+    // Remove Tabulator code completely
+    // Use jQuery to handle actions only
+
+    $(document).ready(function () {
+
+        var materialModal = new bootstrap.Modal($('#materialModal')[0]);
+        var deleteModal = new bootstrap.Modal($('#deleteModal')[0]);
+        var materialForm = $('#materialForm');
+        var deleteId = null;
+
+        // EDIT BUTTON
+        $('#materialTable').on('click', '.edit-btn', function () {
+            var row = $(this).closest('tr'); // the <tr> containing the clicked button
+            var id = row.data('id');
+
+            materialForm[0].dataset.id = id;
+
+            // Fill modal fields
+            $('input[name="material_type_code"]').val(row.find('td:eq(0)').text()).prop('readonly', true).addClass('readonly-field');
+            $('input[name="material_type_name"]').val(row.find('td:eq(1)').text());
+            $('textarea[name="description"]').val(row.find('td:eq(2)').text());
+            $('input[name="default_storage_condition"]').val(row.find('td:eq(3)').text());
+
+            var status = row.find('td:eq(4) .badge').text().trim();
+            $('input[name="active_flag"][value="' + (status == "Active") + '"]').prop('checked', true);
+
+            $('#materialModalLabel').text("Edit Material Type");
+            materialForm.find('button[type="submit"]').text("Update");
+            materialModal.show();
+        });
+
+        // DELETE BUTTON
+        $('#materialTable').on('click', '.delete-btn', function () {
+            var row = $(this).closest('tr');
+            deleteId = row.data('id');
+            $('#deleteItemName').text(row.find('td:eq(1)').text()); // Type Name
+            deleteModal.show();
+        });
+
+    });
+
+
+    // Add Button
+    document.getElementById('addBtn').addEventListener('click', function () {
+        materialForm.reset();
+        materialForm.dataset.id = "";
+        document.querySelector('input[name="material_type_code"]').readOnly = false;
+        document.querySelector('input[name="material_type_code"]').classList.remove('readonly-field');
+        document.getElementById('materialModalLabel').innerText = "Add Material Type";
+        document.querySelector('#materialForm button[type="submit"]').innerText = "Save Material Type";
+        materialModal.show();
+    });
+
+    // Submit Add/Edit
+    materialForm.addEventListener('submit', function(e){
+        e.preventDefault();
+        var id = materialForm.dataset.id;
+        var formData = new FormData(materialForm);
+        var payload = {
+            material_type_code: formData.get('material_type_code'),
+            material_type_name: formData.get('material_type_name'),
+            description: formData.get('description'),
+            default_storage_condition: formData.get('default_storage_condition'),
+            active_flag: formData.get('active_flag')==='true'
+        };
+        var url = id ? `/MaterialType/UpdateMaterial?id=${id}` : materialForm.action;
+
+        fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+        .then(res=>res.json())
+        .then(data=>{
+            alert(data.message);
+            if(data.success){ materialModal.hide(); location.reload(); }
+        }).catch(err=>{ console.error(err); alert("❌ Error saving Material Type."); });
+    });
+
+    // Confirm Delete
+    //document.getElementById('confirmDeleteBtn').addEventListener('click', function(){
+    //    if(!deleteId) return;
+    //    fetch(`/MaterialType/DeleteMaterial?id=${deleteId}`, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'} })
+    //    .then(res=>res.json())
+    //    .then(data=>{
+    //        alert(data.message);
+    //        if(data.success){ deleteModal.hide(); location.reload(); }
+    //    });
+    //});
+
+    // DELETE BUTTON CLICK (show modal)
+    $('#materialTable').on('click', '.delete-btn', function () {
+        var row = $(this).closest('tr');
+        deleteId = row.data('id');
+        $('#deleteItemName').text(row.find('td:eq(1)').text()); // Type Name
+        deleteModal.show();
+    });
+
+    // CONFIRM DELETE
+    $('#confirmDeleteBtn').click(function () {
+        if (!deleteId) return;
+
+        $.ajax({
+            url: '/MaterialType/DeleteMaterial',
+            type: 'POST',
+            data: { id: deleteId }, // send as form data
+            success: function (data) {
+                alert(data.message);
+                if (data.success) {
+                    deleteModal.hide();
+                    // Remove row from table without reload
+                    $('#materialTable').find(`tr[data-id="${deleteId}"]`).remove();
+                }
+            },
+            error: function () {
+                alert("❌ Error deleting material type");
+            }
+        });
+    });
+
+
+    // CSV Import
+    document.getElementById('csvFileInput').addEventListener('change', function(){
+        const file = this.files[0];
+        if(!file) return;
+        const formData = new FormData(); formData.append('file', file);
+        fetch('/MaterialType/ImportCsv', { method:'POST', body:formData })
+        .then(res=>res.json())
+        .then(data=>{
+            alert(data.success ? data.message : "❌ Import failed: " + data.message);
+            if(data.success) location.reload();
+        }).catch(err=>{ console.error(err); alert("❌ Unexpected error during CSV import"); });
+    });
+});
+    </script>
+
+</body>
+</html>
